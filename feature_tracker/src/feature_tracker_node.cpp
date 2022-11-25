@@ -25,6 +25,7 @@ bool first_image_flag = true;
 double last_image_time = 0;
 bool init_pub = 0;
 
+// 图片的回调函数
 void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
     if(first_image_flag)
@@ -205,14 +206,23 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
 
 int main(int argc, char **argv)
 {
+    //初始化ros，指定节点名称
     ros::init(argc, argv, "feature_tracker");
+
+    //创建节点句柄（节点初始化），并指定这个节点的命名空间（~表示私有命名空间）
     ros::NodeHandle n("~");
+
+    //设置输出日志的级别，只有级别大于或等于Info的日志消息才会显示输出
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
+    
+    //读取yaml中的一些配置参数
     readParameters(n);
 
-    for (int i = 0; i < NUM_OF_CAM; i++)
+    //读取每个相机实例对应的相机内参
+    for (int i = 0; i < NUM_OF_CAM; i++) 
         trackerData[i].readIntrinsicParameter(CAM_NAMES[i]);
 
+    //判断是否加入鱼眼mask来去除边缘噪声
     if(FISHEYE)
     {
         for (int i = 0; i < NUM_OF_CAM; i++)
@@ -228,15 +238,23 @@ int main(int argc, char **argv)
         }
     }
 
+    //订阅话题IMAGE_TOPIC(/cam0/image_raw),收到一次message就执行一次回调函数img_callback
     ros::Subscriber sub_img = n.subscribe(IMAGE_TOPIC, 100, img_callback);
 
+    //在feature话题上发布一个类型为sensor_msgs/PointCloud的消息，最多缓存1000条消息，实例feature_points，跟踪的特征点，给后端优化用
+    //因为节点初始化时指定了节点的命名空间，因此时间上实在/feature_tracker/feature话题上发布消息，下同
     pub_img = n.advertise<sensor_msgs::PointCloud>("feature", 1000);
+    //在feature_img话题上发布一个类型为sensor_msgs/Image的消息，最多缓存1000条消息，实例ptr，跟踪的特征点图，给RVIZ用和调试用
     pub_match = n.advertise<sensor_msgs::Image>("feature_img",1000);
+    //在restart话题上发布一个类型为std_msgs/Bool的消息，最多缓存1000条消息
     pub_restart = n.advertise<std_msgs::Bool>("restart",1000);
+
     /*
     if (SHOW_TRACK)
         cv::namedWindow("vis", cv::WINDOW_NORMAL);
     */
+
+    // spin代表这个节点开始循环查询topic是否接收
     ros::spin();
     return 0;
 }
