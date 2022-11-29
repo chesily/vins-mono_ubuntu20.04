@@ -4,16 +4,16 @@ std::string IMAGE_TOPIC;
 std::string IMU_TOPIC;
 std::vector<std::string> CAM_NAMES;
 std::string FISHEYE_MASK;
-int MAX_CNT;
-int MIN_DIST;
-int WINDOW_SIZE;
-int FREQ;
-double F_THRESHOLD;
+int MAX_CNT;  //最大特征点数目
+int MIN_DIST; //特征点之间的最小间隔
+int WINDOW_SIZE;  // 可视化相关
+int FREQ;  //发布跟踪结果的频率
+double F_THRESHOLD;  //ransac阈值（像素）
 int SHOW_TRACK;
 int STEREO_TRACK;
-int EQUALIZE;
-int ROW;
-int COL;
+int EQUALIZE;  //是否进行直方图均衡化（应对太亮或太暗的场景）
+int ROW;  //图像高度
+int COL;  //图像宽度
 int FOCAL_LENGTH;
 int FISHEYE;
 bool PUB_THIS_FRAME;
@@ -34,10 +34,16 @@ T readParam(ros::NodeHandle &n, std::string name)
     return ans;
 }
 
+// 读取配置参数，通过roslaunch文件的参数服务器获得
 void readParameters(ros::NodeHandle &n)
 {
     std::string config_file;
+    /* 
+    获取配置文件的路径（"config_file"的具体路径在.launch文件中定义，
+    以euroc.launch为例，具体路径为$(find feature_tracker)/../config/euroc/euroc_config.yaml）
+    */ 
     config_file = readParam<std::string>(n, "config_file");
+    // 使用opencv的yaml文件接口来读取文件
     cv::FileStorage fsSettings(config_file, cv::FileStorage::READ);
     if(!fsSettings.isOpened())
     {
@@ -54,7 +60,7 @@ void readParameters(ros::NodeHandle &n)
     FREQ = fsSettings["freq"];
     F_THRESHOLD = fsSettings["F_threshold"];
     SHOW_TRACK = fsSettings["show_track"];
-    EQUALIZE = fsSettings["equalize"];
+    EQUALIZE = fsSettings["equalize"]; // 是否做均衡化处理
     FISHEYE = fsSettings["fisheye"];
     if (FISHEYE == 1)
         FISHEYE_MASK = VINS_FOLDER_PATH + "config/fisheye_mask.jpg";

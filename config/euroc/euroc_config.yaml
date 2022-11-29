@@ -3,10 +3,11 @@
 #common parameters
 imu_topic: "/imu0"
 image_topic: "/cam0/image_raw"
-output_path: "/home/shaozu/output/"
+output_path: "/home/vins/output/"  # 输出VINS的运行轨迹和相机与IMU的外参估计(如果estimate_extrinsic不为0的话），如果该文件夹不存在则不输出
+
 
 #camera calibration 
-model_type: PINHOLE
+model_type: PINHOLE  # 针孔相机
 camera_name: camera
 image_width: 752
 image_height: 480
@@ -66,17 +67,19 @@ g_norm: 9.81007     # gravity magnitude
 loop_closure: 1                    # start loop closure
 load_previous_pose_graph: 0        # load and reuse previous pose graph; load from 'pose_graph_save_path'
 fast_relocalization: 0             # useful in real-time and large project
-pose_graph_save_path: "/home/shaozu/output/pose_graph/" # save and load path
+pose_graph_save_path: "/home/vins/output/pose_graph/" # save and load path
 
-#unsynchronization parameters
+#unsynchronization parameters 
+#在线时差校准
 estimate_td: 0                      # online estimate time offset between camera and imu
 td: 0.0                             # initial value of time offset. unit: s. readed image clock + td = real image clock (IMU clock)
 
 #rolling shutter parameters
+#支持卷帘相机
 rolling_shutter: 0                  # 0: global shutter camera, 1: rolling shutter camera
 rolling_shutter_tr: 0               # unit: s. rolling shutter read out time per frame (from data sheet). 
 
 #visualization parameters
 save_image: 1                   # save image in pose graph for visualization prupose; you can close this function by setting 0 
 visualize_imu_forward: 0        # output imu forward propogation to achieve low latency and high frequence results
-visualize_camera_size: 0.4      # size of camera marker in RVIZ
+visualize_camera_size: 0.4      # size of camera marker in RVIZ  在RVIZ显示中相机模型的大小
