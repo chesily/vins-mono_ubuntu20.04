@@ -17,10 +17,10 @@ extern int MIN_DIST; //特征点之间的最小间隔
 extern int WINDOW_SIZE;
 extern int FREQ; //发布跟踪结果的频率
 extern double F_THRESHOLD; //ransac阈值（像素）
-extern int SHOW_TRACK; //是否发布跟踪点图像的topic
+extern int SHOW_TRACK; //是否发布跟踪点图像消息
 extern int STEREO_TRACK; //双目跟踪设为1
 extern int EQUALIZE; //是否进行直方图均衡化（应对太亮或太暗的场景）
 extern int FISHEYE; //使用鱼眼相机设为1
-extern bool PUB_THIS_FRAME; //是否需要发布特征点
+extern bool PUB_THIS_FRAME; //是否发布特征点消息
 
 void readParameters(ros::NodeHandle &n);

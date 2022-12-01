@@ -78,7 +78,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
     else
         PUB_THIS_FRAME = false;
 
-    //将图像编码8UC1转换为mono8，并把ros message转成cv::Mat  
+    //将图像编码从8UC1（灰度图）转换为mono8（灰度图），并把ros message转成cv::Mat  
     cv_bridge::CvImageConstPtr ptr;
     if (img_msg->encoding == "8UC1")
     {
@@ -96,7 +96,8 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
         ptr = cv_bridge::toCvCopy(img_msg, sensor_msgs::image_encodings::MONO8);
     cv::Mat show_img = ptr->image;
 
-    TicToc t_r;
+    TicToc t_r; // 计时器
+
     for (int i = 0; i < NUM_OF_CAM; i++)
     {
         ROS_DEBUG("processing camera %d", i);
@@ -131,9 +132,6 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
             break;
     }
 
-    //1、将特征点id，矫正后归一化平面的3D点(x,y,z=1)，像素2D点(u,v)，像素的速度(vx,vy)，
-    //封装成sensor_msgs::PointCloudPtr类型的feature_points实例中,发布到pub_img;
-    //2、将图像封装到cv_bridge::cvtColor类型的ptr实例中发布到pub_match
     // 发布特征点和特征点图像消息
    if (PUB_THIS_FRAME)
    {
@@ -149,9 +147,10 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
         feature_points->header.frame_id = "world";
 
         vector<set<int>> hash_ids(NUM_OF_CAM);  // 这个并没有用到
+
         for (int i = 0; i < NUM_OF_CAM; i++)
         {
-            auto &un_pts = trackerData[i].cur_un_pts;  // 去畸变的归一化相机坐标系
+            auto &un_pts = trackerData[i].cur_un_pts;  // 去畸变的归一化像素坐标
             auto &cur_pts = trackerData[i].cur_pts;  // 像素坐标
             auto &ids = trackerData[i].ids;  // id
             auto &pts_velocity = trackerData[i].pts_velocity;  // 归一化坐标下的速度
@@ -190,19 +189,19 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
             init_pub = 1;
         }
         else
-            pub_img.publish(feature_points);  // 发布特征点消息
+            pub_img.publish(feature_points);  // 发布特征点消息，包括特征点id，矫正后归一化平面的3D点(x,y,z=1)，像素2D点(u,v)，像素的速度(vx,vy)
 
-        // 可视化相关操作
+        // 发布特征点图像的消息用于可视化
         if (SHOW_TRACK)
         {
             ptr = cv_bridge::cvtColor(ptr, sensor_msgs::image_encodings::BGR8);
             //cv::Mat stereo_img(ROW * NUM_OF_CAM, COL, CV_8UC3);
-            cv::Mat stereo_img = ptr->image;
+            cv::Mat stereo_img = ptr->image;  // 图像浅拷贝
 
             for (int i = 0; i < NUM_OF_CAM; i++)
             {
                 cv::Mat tmp_img = stereo_img.rowRange(i * ROW, (i + 1) * ROW);
-                cv::cvtColor(show_img, tmp_img, CV_GRAY2RGB);
+                cv::cvtColor(show_img, tmp_img, CV_GRAY2RGB); // 将灰度图转换为RGB图
 
                 //显示追踪状态，越红越好，越蓝越不行
                 for (unsigned int j = 0; j < trackerData[i].cur_pts.size(); j++)
@@ -227,7 +226,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
             }
             //cv::imshow("vis", stereo_img);
             //cv::waitKey(5);
-            pub_match.publish(ptr->toImageMsg());
+            pub_match.publish(ptr->toImageMsg());  // 发布特征点图像消息，即在原图像上标出了跟踪到的特征点（越红表示跟踪效果越好，越蓝则越差）
         }
     }
     ROS_INFO("whole feature tracker processing costs: %f", t_r.toc());

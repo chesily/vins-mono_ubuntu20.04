@@ -1,5 +1,6 @@
 #include "feature_tracker.h"
 
+//FeatureTracker的static成员变量n_id初始化为0
 int FeatureTracker::n_id = 0;
 
 bool inBorder(const cv::Point2f &pt)
@@ -28,7 +29,7 @@ void reduceVector(vector<int> &v, vector<uchar> status)
     v.resize(j);
 }
 
-
+//空的构造函数
 FeatureTracker::FeatureTracker()
 {
 }
@@ -78,6 +79,29 @@ void FeatureTracker::addPoints()
     }
 }
 
+/**
+ * @brief 
+ * 
+ * @param[in] _img 输入图像
+ * @param[in] _cur_time 图像的时间戳
+ * 1、图像均衡化预处理
+ * 2、光流追踪
+ * 3、提取新的特征点（如果发布）
+ * 4、所有特征点去畸变，计算速度
+ */
+/**
+ * @brief   对图像使用光流法进行特征点跟踪
+ * @Description createCLAHE() 对图像进行自适应直方图均衡化
+ *              calcOpticalFlowPyrLK() LK金字塔光流法
+ *              setMask() 对跟踪点进行排序，设置mask
+ *              rejectWithF() 通过基本矩阵剔除outliers
+ *              goodFeaturesToTrack() 添加特征点(shi-tomasi角点)，确保每帧都有足够的特征点
+ *              addPoints()添加新的追踪点
+ *              undistortedPoints() 对角点图像坐标去畸变矫正，并计算每个角点的速度
+ * @param[in]   _img 输入图像
+ * @param[in]   _cur_time 当前时间（图像时间戳）
+ * @return      void
+*/
 void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
 {
     cv::Mat img;
