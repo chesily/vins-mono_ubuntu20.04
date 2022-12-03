@@ -121,12 +121,12 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
 #endif
     }
 
-    //更新全局ID
+    //更新新提取的特征点ID
     for (unsigned int i = 0;; i++)
     {
         bool completed = false;
         for (int j = 0; j < NUM_OF_CAM; j++)
-            if (j != 1 || !STEREO_TRACK)  // 只更新单目id
+            if (j != 1 || !STEREO_TRACK)  // 只在单目情形下更新id
                 completed |= trackerData[j].updateID(i); // trackerData[j].updateID(i)更新成功返回true,可以直接用=号
         if (!completed)
             break;
@@ -150,7 +150,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
 
         for (int i = 0; i < NUM_OF_CAM; i++)
         {
-            auto &un_pts = trackerData[i].cur_un_pts;  // 去畸变的归一化像素坐标
+            auto &un_pts = trackerData[i].cur_un_pts;  // 去畸变的归一化坐标
             auto &cur_pts = trackerData[i].cur_pts;  // 像素坐标
             auto &ids = trackerData[i].ids;  // id
             auto &pts_velocity = trackerData[i].pts_velocity;  // 归一化坐标下的速度
@@ -183,7 +183,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
         feature_points->channels.push_back(velocity_y_of_point);
         ROS_DEBUG("publish %f, at %f", feature_points->header.stamp.toSec(), ros::Time::now().toSec());
 
-        // skip the first image; since no optical speed on frist image 第一帧不发布
+        // skip the first image; since no optical speed on frist image 第一帧特征点消息不发布
         if (!init_pub)
         {
             init_pub = 1;
@@ -246,7 +246,7 @@ int main(int argc, char **argv)
     //读取yaml中的配置参数
     readParameters(n);
 
-    //读取每个相机的内参
+    //读取每个相机的参数，并生成相应的相机实例
     for (int i = 0; i < NUM_OF_CAM; i++) 
         trackerData[i].readIntrinsicParameter(CAM_NAMES[i]);
 

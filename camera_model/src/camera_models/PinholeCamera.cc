@@ -441,10 +441,10 @@ PinholeCamera::liftSphere(const Eigen::Vector2d& p, Eigen::Vector3d& P) const
 }
 
 /**
- * \brief Lifts a point from the image plane to its projective ray
+ * \brief Lifts a point from the image plane to its projective ray 将二维像素坐标转换到归一化平面无畸变三维坐标
  *
- * \param p image coordinates
- * \param P coordinates of the projective ray
+ * \param p image coordinates 二维图像坐标
+ * \param P coordinates of the projective ray 三维无畸变的归一化坐标
  */
 void
 PinholeCamera::liftProjective(const Eigen::Vector2d& p, Eigen::Vector3d& P) const
@@ -453,18 +453,19 @@ PinholeCamera::liftProjective(const Eigen::Vector2d& p, Eigen::Vector3d& P) cons
     double rho2_d, rho4_d, radDist_d, Dx_d, Dy_d, inv_denom_d;
     //double lambda;
 
-    // Lift points to normalised plane
+    // Lift points to normalised plane 计算有畸变的归一化坐标
     mx_d = m_inv_K11 * p(0) + m_inv_K13;
     my_d = m_inv_K22 * p(1) + m_inv_K23;
 
     if (m_noDistortion)
     {
+        // 如果没有畸变直接赋值
         mx_u = mx_d;
         my_u = my_d;
     }
     else
     {
-        if (0)
+        if (0) // 直接执行else语句
         {
             double k1 = mParameters.k1();
             double k2 = mParameters.k2();
@@ -488,16 +489,18 @@ PinholeCamera::liftProjective(const Eigen::Vector2d& p, Eigen::Vector3d& P) cons
         }
         else
         {
-            // Recursive distortion model
-            int n = 8;
+            // Recursive distortion model 
+            // 将有畸变的归一化坐标转换为无畸变的归一化坐标的迭代过程，参考https://blog.csdn.net/hltt3838/article/details/119428558
+            int n = 8; // 迭代八次
             Eigen::Vector2d d_u;
+            // 计算畸变更新增量d_u
             distortion(Eigen::Vector2d(mx_d, my_d), d_u);
-            // Approximate value
+            // Approximate value 更新无畸变坐标
             mx_u = mx_d - d_u(0);
             my_u = my_d - d_u(1);
 
             for (int i = 1; i < n; ++i)
-            {
+            { // 上面已经迭代了一次，只需再迭代7次
                 distortion(Eigen::Vector2d(mx_u, my_u), d_u);
                 mx_u = mx_d - d_u(0);
                 my_u = my_d - d_u(1);
@@ -505,7 +508,7 @@ PinholeCamera::liftProjective(const Eigen::Vector2d& p, Eigen::Vector3d& P) cons
         }
     }
 
-    // Obtain a projective ray
+    // Obtain a projective ray // 无畸变的归一化坐标
     P << mx_u, my_u, 1.0;
 }
 
@@ -637,7 +640,7 @@ PinholeCamera::undistToPlane(const Eigen::Vector2d& p_u, Eigen::Vector2d& p) con
 }
 
 /**
- * \brief Apply distortion to input point (from the normalised plane)
+ * \brief Apply distortion to input point (from the normalised plane) 计算用于求解无畸变归一化坐标的迭代更新量
  *
  * \param p_u undistorted coordinates of point on the normalised plane
  * \return to obtain the distorted point: p_d = p_u + d_u

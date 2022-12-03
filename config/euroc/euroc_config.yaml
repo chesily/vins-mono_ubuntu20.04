@@ -7,7 +7,7 @@ output_path: "/home/vins/output/"  # 输出VINS的运行轨迹和相机与IMU的
 
 
 #camera calibration 
-model_type: PINHOLE  # 针孔相机
+model_type: PINHOLE 
 camera_name: camera
 image_width: 752
 image_height: 480

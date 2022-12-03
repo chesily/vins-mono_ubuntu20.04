@@ -27,7 +27,7 @@ void reduceVector(vector<int> &v, vector<uchar> status);
 
 /**
 * @class FeatureTracker
-* @Description 视觉前端预处理：对每个相机进行角点LK光流跟踪
+* @Description 视觉前端预处理：对每个相机中的特征角点进行LK光流跟踪
 */
 class FeatureTracker
 {
@@ -50,25 +50,32 @@ class FeatureTracker
 
     void undistortedPoints();
 
-    cv::Mat mask; //图像掩码
+    cv::Mat mask; // 用于特征点均匀化的图像掩码
     cv::Mat fisheye_mask; //鱼眼相机mask，用来去除边缘噪点
 
-    // prev_img是上一次发布的帧的图像数据
-    // cur_img是光流跟踪的前一帧的图像数据
-    // forw_img是光流跟踪的后一帧的图像数据
+    // prev_img没有用
+    // cur_img是上一帧图像
+    // forw_img是当前帧图像
     cv::Mat prev_img, cur_img, forw_img;
 
     vector<cv::Point2f> n_pts; //每一帧中新提取的特征点
-    vector<cv::Point2f> prev_pts, cur_pts, forw_pts;
-    vector<cv::Point2f> prev_un_pts, cur_un_pts; //归一化相机坐标系下的坐标
+
+    // prev_pts没有用
+    // cur_pts是上一帧图像包含的特征点序列
+    // forw_pts是当前帧图像包含的特征点序列
+    vector<cv::Point2f> prev_pts, cur_pts, forw_pts; 
+    
+    // prev_un_pts没有用
+    // cur_un_pts是上一帧图像特征点对应的去畸变归一化坐标
+    vector<cv::Point2f> prev_un_pts, cur_un_pts; 
     vector<cv::Point2f> pts_velocity; //当前帧相对前一帧特征点沿x,y方向的像素移动速度
     vector<int> ids; //能够被跟踪到的特征点的id
-    vector<int> track_cnt; //当前帧forw_img中每个特征点被追踪的时间次数
-    map<int, cv::Point2f> cur_un_pts_map;
-    map<int, cv::Point2f> prev_un_pts_map;
+    vector<int> track_cnt; //当前帧forw_img中每个特征点被跟踪的实际次数
+    map<int, cv::Point2f> cur_un_pts_map; // 当前帧特征点ID到去畸变归一化坐标的映射
+    map<int, cv::Point2f> prev_un_pts_map; // 上一帧特征点ID到去畸变归一化坐标的映射
     camodocal::CameraPtr m_camera; //相机模型
-    double cur_time;
-    double prev_time;
+    double cur_time;  //当前帧时间戳
+    double prev_time; //上一帧时间戳
 
     static int n_id; //特征点id，每检测到一个新的特征点，就将n_id作为该特征点的id，然后n_id加1
 };

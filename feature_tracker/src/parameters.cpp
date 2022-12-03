@@ -2,7 +2,7 @@
 
 std::string IMAGE_TOPIC;
 std::string IMU_TOPIC;
-std::vector<std::string> CAM_NAMES;
+std::vector<std::string> CAM_NAMES; //相机参数配置文件名
 std::string FISHEYE_MASK;
 int MAX_CNT;  //最大特征点数目
 int MIN_DIST; //特征点之间的最小间隔
