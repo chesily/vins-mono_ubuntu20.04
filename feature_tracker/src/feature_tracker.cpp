@@ -57,7 +57,7 @@ void FeatureTracker::setMask()
     for (unsigned int i = 0; i < forw_pts.size(); i++)
         cnt_pts_id.push_back(make_pair(track_cnt[i], make_pair(forw_pts[i], ids[i])));
 
-    // 排序，跟踪次数越多（越稳定）的点排在越前面（降序排列）
+    // 排序，跟踪次数越多（越稳定）的点排在越前面（降序排列）(使用了lambda表达式)
     sort(cnt_pts_id.begin(), cnt_pts_id.end(), [](const pair<int, pair<cv::Point2f, int>> &a, const pair<int, pair<cv::Point2f, int>> &b)
          {
             return a.first > b.first;
