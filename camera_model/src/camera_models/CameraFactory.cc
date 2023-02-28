@@ -86,7 +86,7 @@ CameraFactory::generateCamera(Camera::ModelType modelType,
     }
 }
 
-CameraPtr
+CameraPtr 
 CameraFactory::generateCameraFromYamlFile(const std::string& filename)
 {
     cv::FileStorage fs(filename, cv::FileStorage::READ);

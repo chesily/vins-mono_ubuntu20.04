@@ -108,7 +108,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
     if (EQUALIZE)
     {
         cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));  //cv::createCLAHE用于生成自适应均衡化的图像
-        TicToc t_c;
+        TicToc t_c;  
         clahe->apply(_img, img); // 均衡化操作
         ROS_DEBUG("CLAHE costs: %fms", t_c.toc()); // 记录均衡化花费的时间
     }
