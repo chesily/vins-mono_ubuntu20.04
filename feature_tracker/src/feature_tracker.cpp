@@ -30,7 +30,7 @@ void reduceVector(vector<int> &v, vector<uchar> status)
     for (int i = 0; i < int(v.size()); i++)
         if (status[i])
             v[j++] = v[i];
-    v.resize(j);
+    v.resize(j);  // 已将status为1的特征点放在v的前面，后面的特征点status为0，需要剔除
 }
 
 //空的构造函数
@@ -104,12 +104,13 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
     TicToc t_r;
     cur_time = _cur_time;
 
-    //STEP 1 直方图均衡化
+    //STEP 1 自适应直方图均衡化
     if (EQUALIZE)
     {
-        cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));  //cv::createCLAHE用于生成自适应均衡化的图像
+        // cv::createCLAHE创建指向cv::CLAHE类的智能指针并初始化，第一个参数是颜色对比度的阈值，第二个参数是进行像素均衡化的网格数量
+        cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8)); 
         TicToc t_c;  
-        clahe->apply(_img, img); // 均衡化操作
+        clahe->apply(_img, img); // 进行自适应直方图均衡化（该方法比使用equalizeHist()进行全局均衡化能保持更多的局部细节）
         ROS_DEBUG("CLAHE costs: %fms", t_c.toc()); // 记录均衡化花费的时间
     }
     else
@@ -132,8 +133,8 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
     if (cur_pts.size() > 0) 
     {
         TicToc t_o;
-        vector<uchar> status; // 特征点的跟踪状态好坏标志位
-        vector<float> err;
+        vector<uchar> status; // 特征点的跟踪状态好坏标志位（1表示特征点被成功跟踪）
+        vector<float> err;    // 衡量特征点相似度或误差
         // 使用具有金字塔的迭代Lucas-Kanade方法计算稀疏光流，常与角点检测函数cv::goodFeaturesToTrack一同使用
         cv::calcOpticalFlowPyrLK(cur_img, forw_img, cur_pts, forw_pts, status, err, cv::Size(21, 21), 3); 
 

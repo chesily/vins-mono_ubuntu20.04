@@ -141,6 +141,7 @@ PinholeCamera::Parameters::cy(void) const
     return m_cy;
 }
 
+// 从yaml文件中读取相机参数（包括相机类型、名称、图像尺寸、畸变系数、内参）
 bool
 PinholeCamera::Parameters::readFromYamlFile(const std::string& filename)
 {
@@ -465,46 +466,21 @@ PinholeCamera::liftProjective(const Eigen::Vector2d& p, Eigen::Vector3d& P) cons
     }
     else
     {
-        if (0) // 直接执行else语句
-        {
-            double k1 = mParameters.k1();
-            double k2 = mParameters.k2();
-            double p1 = mParameters.p1();
-            double p2 = mParameters.p2();
+        // Recursive distortion model 
+        // 将有畸变的归一化坐标转换为无畸变的归一化坐标的迭代过程，参考https://blog.csdn.net/hltt3838/article/details/119428558
+        int n = 8; // 迭代八次
+        Eigen::Vector2d d_u;
+        // 计算畸变更新增量d_u
+        distortion(Eigen::Vector2d(mx_d, my_d), d_u);
+        // Approximate value 更新无畸变坐标
+        mx_u = mx_d - d_u(0);
+        my_u = my_d - d_u(1);
 
-            // Apply inverse distortion model
-            // proposed by Heikkila
-            mx2_d = mx_d*mx_d;
-            my2_d = my_d*my_d;
-            mxy_d = mx_d*my_d;
-            rho2_d = mx2_d+my2_d;
-            rho4_d = rho2_d*rho2_d;
-            radDist_d = k1*rho2_d+k2*rho4_d;
-            Dx_d = mx_d*radDist_d + p2*(rho2_d+2*mx2_d) + 2*p1*mxy_d;
-            Dy_d = my_d*radDist_d + p1*(rho2_d+2*my2_d) + 2*p2*mxy_d;
-            inv_denom_d = 1/(1+4*k1*rho2_d+6*k2*rho4_d+8*p1*my_d+8*p2*mx_d);
-
-            mx_u = mx_d - inv_denom_d*Dx_d;
-            my_u = my_d - inv_denom_d*Dy_d;
-        }
-        else
-        {
-            // Recursive distortion model 
-            // 将有畸变的归一化坐标转换为无畸变的归一化坐标的迭代过程，参考https://blog.csdn.net/hltt3838/article/details/119428558
-            int n = 8; // 迭代八次
-            Eigen::Vector2d d_u;
-            // 计算畸变更新增量d_u
-            distortion(Eigen::Vector2d(mx_d, my_d), d_u);
-            // Approximate value 更新无畸变坐标
+        for (int i = 1; i < n; ++i)
+        { // 上面已经迭代了一次，只需再迭代7次
+            distortion(Eigen::Vector2d(mx_u, my_u), d_u);
             mx_u = mx_d - d_u(0);
             my_u = my_d - d_u(1);
-
-            for (int i = 1; i < n; ++i)
-            { // 上面已经迭代了一次，只需再迭代7次
-                distortion(Eigen::Vector2d(mx_u, my_u), d_u);
-                mx_u = mx_d - d_u(0);
-                my_u = my_d - d_u(1);
-            }
         }
     }
 
@@ -807,6 +783,7 @@ PinholeCamera::getParameters(void) const
     return mParameters;
 }
 
+// 判断是否有畸变，计算内参矩阵的逆
 void
 PinholeCamera::setParameters(const PinholeCamera::Parameters& parameters)
 {

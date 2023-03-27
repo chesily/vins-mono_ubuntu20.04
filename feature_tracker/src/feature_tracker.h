@@ -73,7 +73,7 @@ class FeatureTracker
     vector<int> track_cnt; //当前帧forw_img中每个特征点被跟踪的实际次数
     map<int, cv::Point2f> cur_un_pts_map; // 当前帧特征点ID到去畸变归一化坐标的映射
     map<int, cv::Point2f> prev_un_pts_map; // 上一帧特征点ID到去畸变归一化坐标的映射
-    camodocal::CameraPtr m_camera; //相机模型
+    camodocal::CameraPtr m_camera; //指向相机实例的智能指针
     double cur_time;  //当前帧时间戳
     double prev_time; //上一帧时间戳
 

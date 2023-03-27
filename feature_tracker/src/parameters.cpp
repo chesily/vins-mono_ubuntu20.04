@@ -3,7 +3,7 @@
 // 在parameters.h中使用extern关键字声明的变量的定义性声明（定义性声明是唯一的，定义包括分配内存和初始化）
 std::string IMAGE_TOPIC;
 std::string IMU_TOPIC;
-std::vector<std::string> CAM_NAMES; //相机参数配置文件
+std::vector<std::string> CAM_NAMES; //配置文件路径
 std::string FISHEYE_MASK;
 int MAX_CNT;  //最大特征点数目
 int MIN_DIST; //特征点之间的最小间隔
@@ -19,6 +19,7 @@ int FOCAL_LENGTH; //焦距
 int FISHEYE; //使用鱼眼相机设为1
 bool PUB_THIS_FRAME; //是否发布特征点
 
+// 该模板函数用于检索参数对应的参数值
 template <typename T>
 T readParam(ros::NodeHandle &n, std::string name)
 {
