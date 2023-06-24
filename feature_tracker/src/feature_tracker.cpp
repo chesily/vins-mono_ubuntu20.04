@@ -19,8 +19,8 @@ void reduceVector(vector<cv::Point2f> &v, vector<uchar> status)
     int j = 0;
     for (int i = 0; i < int(v.size()); i++)
         if (status[i])
-            v[j++] = v[i];
-    v.resize(j);
+            v[j++] = v[i]; 
+    v.resize(j);    // 将status为1的特征点放在v的前面，后面的特征点status为0，然后剔除
 }
 
 //剔除状态位status为0的特征点
@@ -30,7 +30,7 @@ void reduceVector(vector<int> &v, vector<uchar> status)
     for (int i = 0; i < int(v.size()); i++)
         if (status[i])
             v[j++] = v[i];
-    v.resize(j);  // 已将status为1的特征点放在v的前面，后面的特征点status为0，需要剔除
+    v.resize(j);  // 将status为1的特征点放在v的前面，后面的特征点status为0，然后剔除
 }
 
 //空的构造函数
@@ -39,7 +39,7 @@ FeatureTracker::FeatureTracker()
 }
 
 /**
- * @brief   对当前帧跟踪到的特征点按照跟踪次数进行排序，并设置掩码为新提取特征点的均匀化做准备            
+ * @brief   对当前帧跟踪到的特征点按照跟踪次数重新进行排序，并设置掩码使得接下来能均匀提取新特征点          
  * @return  void
 */
 void FeatureTracker::setMask()
@@ -47,7 +47,7 @@ void FeatureTracker::setMask()
     if(FISHEYE)
         mask = fisheye_mask.clone();
     else
-        mask = cv::Mat(ROW, COL, CV_8UC1, cv::Scalar(255));
+        mask = cv::Mat(ROW, COL, CV_8UC1, cv::Scalar(255)); // 像素灰度值全为255的图像掩码
     
 
     // prefer to keep features that are tracked for long time
@@ -69,13 +69,13 @@ void FeatureTracker::setMask()
 
     for (auto &it : cnt_pts_id)
     {
-        if (mask.at<uchar>(it.second.first) == 255) // 这个条件好像一定会满足
+        if (mask.at<uchar>(it.second.first) == 255) // 特征点是否在图像范围内（这个条件对于普通单目相机来说经过前面的outlier剔除一定会满足）
         {
-            // 对位于图像边界内的特征点按照跟踪次数大小重新存储
+            // 对位于图像边界（掩码范围）内的特征点按照跟踪次数大小重新存储
             forw_pts.push_back(it.second.first);
             ids.push_back(it.second.second);
             track_cnt.push_back(it.first);
-            // 将特征点周围半径为MIN-DIST（默认为30）的圆内的灰度置0，用于特征点均匀化
+            // 将特征点周围半径为MIN_DIST（默认为30）的圆内的灰度置0，用于特征点均匀化（掩码）
             cv::circle(mask, it.second.first, MIN_DIST, 0, -1);
         }
     }
@@ -104,7 +104,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
     TicToc t_r;
     cur_time = _cur_time;
 
-    //STEP 1 自适应直方图均衡化
+    //STEP1 自适应直方图均衡化
     if (EQUALIZE)
     {
         // cv::createCLAHE创建指向cv::CLAHE类的智能指针并初始化，第一个参数是颜色对比度的阈值，第二个参数是进行像素均衡化的网格数量
@@ -129,19 +129,20 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
     //此时forw_pts还保存的是上一帧图像中的特征点，所以把它清空
     forw_pts.clear();
 
-    // STEP 2 LK光流跟踪
+    // STEP2 使用LK光流跟踪算法找到当前帧对应的特征点
     if (cur_pts.size() > 0) 
     {
         TicToc t_o;
         vector<uchar> status; // 特征点的跟踪状态好坏标志位（1表示特征点被成功跟踪）
         vector<float> err;    // 衡量特征点相似度或误差
-        // 使用具有金字塔的迭代Lucas-Kanade方法计算稀疏光流，常与角点检测函数cv::goodFeaturesToTrack一同使用
+        // STEP2.1 使用具有金字塔的迭代Lucas-Kanade方法计算稀疏光流，常与角点检测函数cv::goodFeaturesToTrack一同使用
         cv::calcOpticalFlowPyrLK(cur_img, forw_img, cur_pts, forw_pts, status, err, cv::Size(21, 21), 3); 
 
-        // 剔除跟踪失败的特征点
+        // STEP2.2 通过图像边界额外标记outlier
         for (int i = 0; i < int(forw_pts.size()); i++)
-            if (status[i] && !inBorder(forw_pts[i])) // 通过检查是否在图像边界内来剔除外点
+            if (status[i] && !inBorder(forw_pts[i]))
                 status[i] = 0;
+        // STEP2.3 剔除outlier(跟踪失败的特征点和图像边界外的特征点)
         reduceVector(prev_pts, status);  // 没用到
         reduceVector(cur_pts, status);  // 上一帧图像提取的特征点
         reduceVector(forw_pts, status); // 当前帧图像提取的特征点
@@ -158,14 +159,15 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
     // 如果需要发布该帧的特征点消息，还需进行进一步处理
     if (PUB_THIS_FRAME)
     {
-        // STEP 3 通过基础矩阵来剔除外点(可选)
+        // STEP3 通过对极约束来剔除outlier(按一定频率，并不是每帧图像都进行)
         rejectWithF();
+        // STEP4 对当前帧跟踪到的特征点按照跟踪次数重新进行排序，并设置掩码使得接下来能均匀提取新特征点（按一定频率，并不是每帧图像都进行）
         ROS_DEBUG("set mask begins");
         TicToc t_m;
-        // STEP 4 提取新的特征点（可选）
         setMask();
         ROS_DEBUG("set mask costs %fms", t_m.toc());
 
+        // STEP5 提取新的特征点（按一定频率，并不是每帧图像都进行）
         ROS_DEBUG("detect feature begins");
         TicToc t_t;
         // 计算是否需要提取新的特征点
@@ -197,6 +199,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
             n_pts.clear();
         ROS_DEBUG("detect feature costs: %fms", t_t.toc());
 
+        // STEP6 添加新提取到的特征点（按一定频率，并不是每帧图像都进行）
         ROS_DEBUG("add feature begins");
         TicToc t_a;
         addPoints();
@@ -209,10 +212,11 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
     prev_un_pts = cur_un_pts;
 
     // 使用当前帧数据更新上一帧数据
+    // !注意：此后使用cur_pts的操作都是针对当前帧特征点了
     cur_img = forw_img;
     cur_pts = forw_pts;
 
-    // STEP 5 计算当前帧特征点去畸变后的归一化坐标和特征点速度
+    // STEP7 计算当前帧特征点去畸变后的归一化坐标和归一化平面特征点速度
     undistortedPoints();
     // 使用当前帧时间更新上一帧时间
     prev_time = cur_time;
@@ -233,10 +237,10 @@ void FeatureTracker::rejectWithF()
         for (unsigned int i = 0; i < cur_pts.size(); i++)
         {
             Eigen::Vector3d tmp_p;
-            //根据不同的相机模型将二维像素坐标转换到归一化平面无畸变三维坐标
+            //STEP1 将上一帧和当前帧光流跟踪成功的特征点对的二维像素坐标转换到归一化平面无畸变三维坐标，然后再投影到虚拟相机像素坐标系
             //也可使用cv::unidistortPoints()函数实现，但效率似乎比该方法低
             m_camera->liftProjective(Eigen::Vector2d(cur_pts[i].x, cur_pts[i].y), tmp_p);
-            //投影到虚拟相机的像素坐标系（固定焦距），使得F_THRESHOLD与相机无关
+            //投影到虚拟相机的像素坐标系（固定焦距），使得F_THRESHOLD与相机无关（在不同的焦距下该参数的值应该不同，比如在460焦距下能容忍3像素的噪声，在920焦距下应该为6像素）
             //参考https://github.com/HKUST-Aerial-Robotics/VINS-Mono/issues/48
             tmp_p.x() = FOCAL_LENGTH * tmp_p.x() / tmp_p.z() + COL / 2.0;
             tmp_p.y() = FOCAL_LENGTH * tmp_p.y() / tmp_p.z() + ROW / 2.0;
@@ -248,9 +252,10 @@ void FeatureTracker::rejectWithF()
             un_forw_pts[i] = cv::Point2f(tmp_p.x(), tmp_p.y());
         }
 
-        vector<uchar> status;
-        //调用cv::findFundamentalMat对un_cur_pts和un_forw_pts计算基础矩阵，用于对不满足对极约束的外点进行剔除
+        vector<uchar> status;  
+        //STEP2 使用RANSAC算法计算虚拟相机的基础矩阵
         cv::findFundamentalMat(un_cur_pts, un_forw_pts, cv::FM_RANSAC, F_THRESHOLD, 0.99, status);
+        //STEP3 剔除不满足对极约束的outlier
         int size_a = cur_pts.size();
         reduceVector(prev_pts, status);
         reduceVector(cur_pts, status);
@@ -263,7 +268,11 @@ void FeatureTracker::rejectWithF()
     }
 }
 
-// 更新新提取到的特征点ID
+/**
+ * @brief       更新新提取到的特征点ID
+ * @param[in]   i 特征点ID容器索引（不是ID）
+ * @return      bool
+*/
 bool FeatureTracker::updateID(unsigned int i)
 {
     if (i < ids.size())
@@ -319,25 +328,27 @@ void FeatureTracker::showUndistortion(const string &name)
     cv::waitKey(0);
 }
 
-// 计算当前帧特征点去畸变后的归一化坐标和特征点速度
+/**
+ * @brief   对当前帧特征点进行去畸变矫正和深度归一化，然后计算其在归一化平面的速度
+ * @return  void
+*/
 void FeatureTracker::undistortedPoints()
 {
     cur_un_pts.clear();
     cur_un_pts_map.clear();
-    //cv::undistortPoints(cur_pts, un_pts, K, cv::Mat());
-    // 这里处理的仍然是当前帧数据，不过上一帧数据已经被当前帧数据更新了，所以看起来是在处理上一帧数据
+    // 这里处理的是当前帧特征点数据（上一帧特征点数据此时已经被当前帧更新了）
     for (unsigned int i = 0; i < cur_pts.size(); i++)
     {
         Eigen::Vector2d a(cur_pts[i].x, cur_pts[i].y);
         Eigen::Vector3d b;
-        //根据不同的相机模型将二维像素坐标转换到归一化平面无畸变三维坐标
+        //将当前帧特征点的二维像素坐标转换到归一化平面无畸变三维坐标
         m_camera->liftProjective(a, b);
         cur_un_pts.push_back(cv::Point2f(b.x() / b.z(), b.y() / b.z()));
         cur_un_pts_map.insert(make_pair(ids[i], cv::Point2f(b.x() / b.z(), b.y() / b.z())));
         //printf("cur pts id %d %f %f", ids[i], cur_un_pts[i].x, cur_un_pts[i].y);
     }
     // caculate points velocity
-    // 计算每个特征点的速度pts_velocity
+    // 计算每个特征点在归一化平面上的速度pts_velocity
     if (!prev_un_pts_map.empty())
     {
         double dt = cur_time - prev_time;
@@ -349,11 +360,12 @@ void FeatureTracker::undistortedPoints()
             {
                 std::map<int, cv::Point2f>::iterator it;
                 it = prev_un_pts_map.find(ids[i]);
+                // 如果在上一帧找到同一个特征点（感觉一定会满足？）
                 if (it != prev_un_pts_map.end())
                 {
                     double v_x = (cur_un_pts[i].x - it->second.x) / dt;
                     double v_y = (cur_un_pts[i].y - it->second.y) / dt;
-                    // 得到在归一化平面上的速度（并不是像素平面）
+                    // 得到在归一化平面上的速度（并不是相机成像平面）
                     pts_velocity.push_back(cv::Point2f(v_x, v_y));
                 }
                 else

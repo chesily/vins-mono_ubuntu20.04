@@ -20,6 +20,7 @@ CameraPoseVisualization keyframebasevisual(0.0, 0.0, 1.0, 1.0);
 static double sum_of_path = 0;
 static Vector3d last_path(0.0, 0.0, 0.0);
 
+// 注册待发布的topic
 void registerPub(ros::NodeHandle &n)
 {
     pub_latest_odometry = n.advertise<nav_msgs::Odometry>("imu_propagate", 1000);
@@ -36,12 +37,21 @@ void registerPub(ros::NodeHandle &n)
     pub_extrinsic = n.advertise<nav_msgs::Odometry>("extrinsic", 1000);
     pub_relo_relative_pose=  n.advertise<nav_msgs::Odometry>("relo_relative_pose", 1000);
 
+    // 可视化的相关设置
     cameraposevisual.setScale(1);
     cameraposevisual.setLineWidth(0.05);
     keyframebasevisual.setScale(0.1);
     keyframebasevisual.setLineWidth(0.01);
 }
 
+/**
+ * @brief 发送IMU里程计（包括位姿和速度），能够获取IMU速率级的位姿
+ * 
+ * @param[in] P 位置
+ * @param[in] Q 姿态
+ * @param[in] V 速度
+ * @param[in] header 头信息，包括时间戳和帧ID
+ */
 void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, const Eigen::Vector3d &V, const std_msgs::Header &header)
 {
     Eigen::Quaterniond quadrotor_Q = Q ;
@@ -62,10 +72,17 @@ void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, co
     pub_latest_odometry.publish(odometry);
 }
 
+/**
+ * @brief 打印相机位姿、外参、VO花费的时间、运行的轨迹长度和时间戳延迟
+ * 
+ * @param[in] estimator 状态估计器对象
+ * @param[in] t VO花费的时间
+ */
 void printStatistics(const Estimator &estimator, double t)
 {
     if (estimator.solver_flag != Estimator::SolverFlag::NON_LINEAR)
         return;
+    // 打印相机位姿
     printf("position: %f, %f, %f\r", estimator.Ps[WINDOW_SIZE].x(), estimator.Ps[WINDOW_SIZE].y(), estimator.Ps[WINDOW_SIZE].z());
     ROS_DEBUG_STREAM("position: " << estimator.Ps[WINDOW_SIZE].transpose());
     ROS_DEBUG_STREAM("orientation: " << estimator.Vs[WINDOW_SIZE].transpose());
@@ -73,7 +90,8 @@ void printStatistics(const Estimator &estimator, double t)
     {
         //ROS_DEBUG("calibration result for camera %d", i);
         ROS_DEBUG_STREAM("extirnsic tic: " << estimator.tic[i].transpose());
-        ROS_DEBUG_STREAM("extrinsic ric: " << Utility::R2ypr(estimator.ric[i]).transpose());
+        ROS_DEBUG_STREAM("extrinsic ric: " << Utility::R2ypr(estimator.ric[i]).transpose()); // 从相机到IMU的欧拉角变换
+        // 将标定的外参写入文件
         if (ESTIMATE_EXTRINSIC)
         {
             cv::FileStorage fs(EX_CALIB_RESULT_PATH, cv::FileStorage::WRITE);
@@ -89,6 +107,7 @@ void printStatistics(const Estimator &estimator, double t)
         }
     }
 
+    // 打印VO花费的时间
     static double sum_of_time = 0;
     static int sum_of_calculation = 0;
     sum_of_time += t;
@@ -96,15 +115,24 @@ void printStatistics(const Estimator &estimator, double t)
     ROS_DEBUG("vo solver costs: %f ms", t);
     ROS_DEBUG("average of time %f ms", sum_of_time / sum_of_calculation);
 
-    sum_of_path += (estimator.Ps[WINDOW_SIZE] - last_path).norm();
+    sum_of_path += (estimator.Ps[WINDOW_SIZE] - last_path).norm(); // 计算总轨迹长度
     last_path = estimator.Ps[WINDOW_SIZE];
     ROS_DEBUG("sum of path %f", sum_of_path);
+
+    // 打印IMU与相机之间的时间戳延迟
     if (ESTIMATE_TD)
         ROS_INFO("td %f", estimator.td);
 }
 
+/**
+ * @brief 发布并在文件中保存视觉惯性里程计（包括位姿和速度），发布里程计轨迹
+ * 
+ * @param[in] estimator 状态估计器对象
+ * @param[in] header 头信息，包括时间戳和帧ID
+ */
 void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
 {
+    // 只有VIO初始化完成后才发布（estimator初始化时solver_flag是INITIAL）
     if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
     {
         nav_msgs::Odometry odometry;
@@ -123,7 +151,7 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
         odometry.twist.twist.linear.x = estimator.Vs[WINDOW_SIZE].x();
         odometry.twist.twist.linear.y = estimator.Vs[WINDOW_SIZE].y();
         odometry.twist.twist.linear.z = estimator.Vs[WINDOW_SIZE].z();
-        pub_odometry.publish(odometry);
+        pub_odometry.publish(odometry); // 发布位姿里程计
 
         geometry_msgs::PoseStamped pose_stamped;
         pose_stamped.header = header;
@@ -132,7 +160,7 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
         path.header = header;
         path.header.frame_id = "world";
         path.poses.push_back(pose_stamped);
-        pub_path.publish(path);
+        pub_path.publish(path); // 发布轨迹
 
         Vector3d correct_t;
         Vector3d correct_v;
@@ -151,12 +179,13 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
         relo_path.header = header;
         relo_path.header.frame_id = "world";
         relo_path.poses.push_back(pose_stamped);
-        pub_relo_path.publish(relo_path);
+        pub_relo_path.publish(relo_path); // 发布经过回环矫正的轨迹
 
         // write result to file
-        ofstream foutC(VINS_RESULT_PATH, ios::app);
-        foutC.setf(ios::fixed, ios::floatfield);
-        foutC.precision(0);
+        // 将dometry发布的位姿和速度写入文件中
+        ofstream foutC(VINS_RESULT_PATH, ios::app); // 如果没有文件，生成空文件；如果有文件，在文件尾追加
+        foutC.setf(ios::fixed, ios::floatfield);    // 将输出流的浮点数格式设置为固定点表示法，即小数点后面的位数固定
+        foutC.precision(0);  // 设置输出流的小数点后面的位数为0，即只显示整数部分
         foutC << header.stamp.toSec() * 1e9 << ",";
         foutC.precision(5);
         foutC << estimator.Ps[WINDOW_SIZE].x() << ","
@@ -173,6 +202,12 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
     }
 }
 
+/**
+ * @brief 发布滑动窗口中关键点的三维坐标（用于可视化？）
+ * 
+ * @param[in] estimator 状态估计器对象
+ * @param[in] header 头信息，包括时间戳和帧ID
+ */
 void pubKeyPoses(const Estimator &estimator, const std_msgs::Header &header)
 {
     if (estimator.key_poses.size() == 0)
@@ -207,8 +242,15 @@ void pubKeyPoses(const Estimator &estimator, const std_msgs::Header &header)
     pub_key_poses.publish(key_poses);
 }
 
+/**
+ * @brief 发布相机位姿的里程计（这里使用了滑动窗口中第二新的关键帧位姿转换得到）
+ * 
+ * @param[in] estimator 状态估计器对象
+ * @param[in] header 头信息，包括时间戳和帧ID
+ */
 void pubCameraPose(const Estimator &estimator, const std_msgs::Header &header)
 {
+    // TODO为什么不使用最新的关键帧
     int idx2 = WINDOW_SIZE - 1;
 
     if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
@@ -236,7 +278,12 @@ void pubCameraPose(const Estimator &estimator, const std_msgs::Header &header)
     }
 }
 
-
+/**
+ * @brief 发布特征点点云信息（特征点在世界坐标系下的三维坐标）
+ * 
+ * @param[in] estimator 状态估计器对象
+ * @param[in] header 头信息，包括时间戳和帧ID
+ */
 void pubPointCloud(const Estimator &estimator, const std_msgs::Header &header)
 {
     sensor_msgs::PointCloud point_cloud, loop_point_cloud;
@@ -279,7 +326,7 @@ void pubPointCloud(const Estimator &estimator, const std_msgs::Header &header)
         //        continue;
 
         if (it_per_id.start_frame == 0 && it_per_id.feature_per_frame.size() <= 2 
-            && it_per_id.solve_flag == 1 )
+            && it_per_id.solve_flag == 1)
         {
             int imu_i = it_per_id.start_frame;
             Vector3d pts_i = it_per_id.feature_per_frame[0].point * it_per_id.estimated_depth;
@@ -295,11 +342,17 @@ void pubPointCloud(const Estimator &estimator, const std_msgs::Header &header)
     pub_margin_cloud.publish(margin_cloud);
 }
 
-
+/**
+ * @brief 发布相机与IMU之间的外参
+ * 
+ * @param[in] estimator 状态估计器对象
+ * @param[in] header 头信息，包括时间戳和帧ID
+ */
 void pubTF(const Estimator &estimator, const std_msgs::Header &header)
 {
-    if( estimator.solver_flag != Estimator::SolverFlag::NON_LINEAR)
+    if(estimator.solver_flag != Estimator::SolverFlag::NON_LINEAR)
         return;
+    // 使用TransformBroadcaster对象广播位姿变换信息到TF
     static tf::TransformBroadcaster br;
     tf::Transform transform;
     tf::Quaternion q;
@@ -345,6 +398,12 @@ void pubTF(const Estimator &estimator, const std_msgs::Header &header)
 
 }
 
+/**
+ * @brief 发布滑动窗口中第三新的里程计及对应的特征点点云
+ * 
+ * @param[in] estimator 状态估计器对象
+ * @param[in] header 头信息，包括时间戳和帧ID
+ */
 void pubKeyframe(const Estimator &estimator)
 {
     // pub camera pose, 2D-3D points of keyframe
@@ -403,6 +462,12 @@ void pubKeyframe(const Estimator &estimator)
     }
 }
 
+/**
+ * @brief 发布重定位的位姿（不包括速度）
+ * 
+ * @param[in] estimator 状态估计器对象
+ * @param[in] header 头信息，包括时间戳和帧ID
+ */
 void pubRelocalization(const Estimator &estimator)
 {
     nav_msgs::Odometry odometry;

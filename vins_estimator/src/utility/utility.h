@@ -12,6 +12,7 @@
 class Utility
 {
   public:
+    // 将旋转向量转换为四元数（下面为旋转向量小角度时的近似情况）
     template <typename Derived>
     static Eigen::Quaternion<typename Derived::Scalar> deltaQ(const Eigen::MatrixBase<Derived> &theta)
     {
@@ -67,21 +68,26 @@ class Utility
         return ans;
     }
 
+    // 将旋转矩阵转换为欧拉角
+    // R = [cpcy        cpsy        -sp
+    //      srspcy-crsy srspsy+crcy srcp
+    //      crspcy+srsy crspsy-srcy crcp]
+    // 这里的输入实际上是R^T（即调用这个函数时需要将旋转矩阵转置）
     static Eigen::Vector3d R2ypr(const Eigen::Matrix3d &R)
     {
-        Eigen::Vector3d n = R.col(0);
+        Eigen::Vector3d n = R.col(0);  // 第一列
         Eigen::Vector3d o = R.col(1);
         Eigen::Vector3d a = R.col(2);
 
         Eigen::Vector3d ypr(3);
-        double y = atan2(n(1), n(0));
-        double p = atan2(-n(2), n(0) * cos(y) + n(1) * sin(y));
-        double r = atan2(a(0) * sin(y) - a(1) * cos(y), -o(0) * sin(y) + o(1) * cos(y));
+        double y = atan2(n(1), n(0));                                                     // 偏航角
+        double p = atan2(-n(2), n(0) * cos(y) + n(1) * sin(y));                           // 俯仰角 
+        double r = atan2(a(0) * sin(y) - a(1) * cos(y), -o(0) * sin(y) + o(1) * cos(y));  // 滚转角
         ypr(0) = y;
         ypr(1) = p;
         ypr(2) = r;
 
-        return ypr / M_PI * 180.0;
+        return ypr / M_PI * 180.0; // 将弧度转换为度
     }
 
     template <typename Derived>
@@ -151,35 +157,39 @@ class FileSystemHelper
      * Recursively create directory if `path` not exists.
      * Return 0 if success.
      *****************************************************************************/
+    // 静态函数成员，用于递归地创建目录
+    // 该函数体中的操作可参考https://blog.csdn.net/simmerlee/article/details/8281399
     static int createDirectoryIfNotExists(const char *path)
     {
         struct stat info;
-        int statRC = stat(path, &info);
+        int statRC = stat(path, &info); //获取指定路径的文件或目录的信息（stat()函数执行成功返回0，执行失败返回-1，错误码存于errno中）
         if( statRC != 0 )
         {
-            if (errno == ENOENT)  
+            if (errno == ENOENT)  // linux系统符号，errno表示最新的错误码，ENOENT表示没有这样的目录
             {
                 printf("%s not exists, trying to create it \n", path);
-                if (! createDirectoryIfNotExists(dirname(strdupa(path))))
+                // strdupa()复制了路径字符串（生成一个新的指针指向该字符串），dirname()获取了父目录名（该函数返回字符串直到最后一个/,但不包括最后一个/）
+                if (! createDirectoryIfNotExists(dirname(strdupa(path))))   
                 {
+                    // 使用mkdir函数创建目录，S_IRWXU表示文件所有者具有读、写、执行权限，S_IRWXG表示用户组具有读、写、执行权限，S_IROTH表示其他用户具可读取权限，S_IXOTH表示其他用户具可执行权限
                     if (mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0)
                     {
                         fprintf(stderr, "Failed to create folder %s \n", path);
                         return 1;
-                    }
+                    }                             
                     else
                         return 0;
                 }
                 else 
                     return 1;
             } // directory not exists
-            if (errno == ENOTDIR) 
+            if (errno == ENOTDIR)   // linux系统符号，errno表示最新的错误码，ENOTDIR表示不是一个目录
             { 
                 fprintf(stderr, "%s is not a directory path \n", path);
                 return 1; 
             } // something in path prefix is not a dir
             return 1;
         }
-        return ( info.st_mode & S_IFDIR ) ? 0 : 1;
+        return ( info.st_mode & S_IFDIR ) ? 0 : 1;  // 如果path对应的info的文件状态是目录的话，返回0
     }
 };

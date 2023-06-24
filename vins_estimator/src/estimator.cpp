@@ -1,11 +1,12 @@
 #include "estimator.h"
 
-Estimator::Estimator(): f_manager{Rs}
+Estimator::Estimator(): f_manager{Rs}  //这里使用花括号初始化，使得若存在类型转换且具有丢失信息的风险时，编译器将会报错，即更加安全
 {
     ROS_INFO("init begins");
     clearState();
 }
 
+// 设置估计器的参数，包括外参、视觉测量残差的信息矩阵和时间戳延迟
 void Estimator::setParameter()
 {
     for (int i = 0; i < NUM_OF_CAM; i++)
@@ -14,11 +15,13 @@ void Estimator::setParameter()
         ric[i] = RIC[i];
     }
     f_manager.setRic(ric);
+    // 这里可以看到虚拟相机的用法
     ProjectionFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
     ProjectionTdFactor::sqrt_info = FOCAL_LENGTH / 1.5 * Matrix2d::Identity();
     td = TD;
 }
 
+// 清空或初始化滑动窗口中所有的状态量
 void Estimator::clearState()
 {
     for (int i = 0; i < WINDOW_SIZE + 1; i++)
@@ -57,7 +60,6 @@ void Estimator::clearState()
     sum_of_back = 0;
     sum_of_front = 0;
     frame_count = 0;
-    solver_flag = INITIAL;
     initial_timestamp = 0;
     all_image_frame.clear();
     td = TD;
@@ -81,6 +83,14 @@ void Estimator::clearState()
     drift_correct_t = Vector3d::Zero();
 }
 
+/**
+ * @brief   处理IMU数据
+ * @Description IMU预积分，中值积分得到当前PQV作为优化初值
+ * @param[in]   dt 两帧IMU之间的时间间隔
+ * @param[in]   linear_acceleration 线加速度
+ * @param[in]   angular_velocity 角速度
+ * @return  void
+*/
 void Estimator::processIMU(double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity)
 {
     if (!first_imu)
@@ -90,20 +100,25 @@ void Estimator::processIMU(double dt, const Vector3d &linear_acceleration, const
         gyr_0 = angular_velocity;
     }
 
+    // 滑窗中保留11帧，frame_count表示现在处理第几帧，一般处理到第11帧时就保持不变了
+    // 由于预积分是帧间约束，因此第1个预积分量实际上是用不到的
     if (!pre_integrations[frame_count])
     {
         pre_integrations[frame_count] = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
     }
+    // 所以只有大于0才处理    
     if (frame_count != 0)
     {
         pre_integrations[frame_count]->push_back(dt, linear_acceleration, angular_velocity);
         //if(solver_flag != NON_LINEAR)
             tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity);
 
+        // 保存传感器数据
         dt_buf[frame_count].push_back(dt);
         linear_acceleration_buf[frame_count].push_back(linear_acceleration);
         angular_velocity_buf[frame_count].push_back(angular_velocity);
 
+        // 中值积分更新滑窗中状态量（与IMU预积分中的操作相同），本质是给非线性优化提供可信的初始值
         int j = frame_count;         
         Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - g;
         Vector3d un_gyr = 0.5 * (gyr_0 + angular_velocity) - Bgs[j];
@@ -215,6 +230,7 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
         last_P0 = Ps[0];
     }
 }
+
 bool Estimator::initialStructure()
 {
     TicToc t_sfm;

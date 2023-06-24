@@ -22,7 +22,10 @@
 #include <queue>
 #include <opencv2/core/eigen.hpp>
 
-
+/**
+* @class Estimator 状态估计器
+* @Description IMU预积分，图像IMU融合的初始化和状态估计，重定位
+*/
 class Estimator
 {
   public:
@@ -68,35 +71,37 @@ class Estimator
     MatrixXd Ap[2], backup_A;
     VectorXd bp[2], backup_b;
 
-    Matrix3d ric[NUM_OF_CAM];
-    Vector3d tic[NUM_OF_CAM];
+    Matrix3d ric[NUM_OF_CAM];   // 从相机到IMU的旋转矩阵数组
+    Vector3d tic[NUM_OF_CAM];   // 从相机到IMU的平移向量数组
 
+    //滑窗中的[P,V,R,Ba,Bg]
     Vector3d Ps[(WINDOW_SIZE + 1)];
     Vector3d Vs[(WINDOW_SIZE + 1)];
     Matrix3d Rs[(WINDOW_SIZE + 1)];
     Vector3d Bas[(WINDOW_SIZE + 1)];
     Vector3d Bgs[(WINDOW_SIZE + 1)];
-    double td;
+    double td;      // IMU和相机的时间戳延迟（单位：秒,cam_clock + td = imu_clock）
 
     Matrix3d back_R0, last_R, last_R0;
     Vector3d back_P0, last_P, last_P0;
     std_msgs::Header Headers[(WINDOW_SIZE + 1)];
 
-    IntegrationBase *pre_integrations[(WINDOW_SIZE + 1)];
-    Vector3d acc_0, gyr_0;
+    IntegrationBase *pre_integrations[(WINDOW_SIZE + 1)]; // 预积分量（初始化为空指针）
+    Vector3d acc_0, gyr_0;  // 上一帧IMU测量
 
+    //滑窗中的dt,a,v
     vector<double> dt_buf[(WINDOW_SIZE + 1)];
     vector<Vector3d> linear_acceleration_buf[(WINDOW_SIZE + 1)];
     vector<Vector3d> angular_velocity_buf[(WINDOW_SIZE + 1)];
 
-    int frame_count;
+    int frame_count; // 滑动窗口内图像帧的数量（初始化为0）
     int sum_of_outlier, sum_of_back, sum_of_front, sum_of_invalid;
 
     FeatureManager f_manager;
     MotionEstimator m_estimator;
     InitialEXRotation initial_ex_rotation;
 
-    bool first_imu;
+    bool first_imu;  // 是否为第一帧IMU（初始化为false）
     bool is_valid, is_key;
     bool failure_occur;
 
@@ -119,10 +124,12 @@ class Estimator
     MarginalizationInfo *last_marginalization_info;
     vector<double *> last_marginalization_parameter_blocks;
 
+    //kay是时间戳，val是图像帧
+    //图像帧中保存了图像帧的特征点、时间戳、位姿Rt，预积分对象pre_integration，是否是关键帧
     map<double, ImageFrame> all_image_frame;
     IntegrationBase *tmp_pre_integration;
 
-    //relocalization variable
+    //relocalization variable 重定位所需的变量
     bool relocalization_info;
     double relo_frame_stamp;
     double relo_frame_index;
