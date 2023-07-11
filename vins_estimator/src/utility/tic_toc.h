@@ -21,7 +21,7 @@ class TicToc
     {
         end = std::chrono::system_clock::now();
         std::chrono::duration<double> elapsed_seconds = end - start;
-        return elapsed_seconds.count() * 1000;
+        return elapsed_seconds.count() * 1000; // 返回毫秒
     }
 
   private:

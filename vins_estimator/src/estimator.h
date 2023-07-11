@@ -55,8 +55,8 @@ class Estimator
 
     enum SolverFlag
     {
-        INITIAL,
-        NON_LINEAR
+        INITIAL,   // 表明系统还未初始化
+        NON_LINEAR // 表明系统已经初始化
     };
 
     enum MarginalizationFlag
@@ -67,26 +67,25 @@ class Estimator
 
     SolverFlag solver_flag;
     MarginalizationFlag  marginalization_flag;
-    Vector3d g;
+    Vector3d g;  // 重力向量
     MatrixXd Ap[2], backup_A;
     VectorXd bp[2], backup_b;
 
     Matrix3d ric[NUM_OF_CAM];   // 从相机到IMU的旋转矩阵数组
     Vector3d tic[NUM_OF_CAM];   // 从相机到IMU的平移向量数组
 
-    //滑窗中的[P,V,R,Ba,Bg]
-    Vector3d Ps[(WINDOW_SIZE + 1)];
-    Vector3d Vs[(WINDOW_SIZE + 1)];
-    Matrix3d Rs[(WINDOW_SIZE + 1)];
-    Vector3d Bas[(WINDOW_SIZE + 1)];
-    Vector3d Bgs[(WINDOW_SIZE + 1)];
-    double td;      // IMU和相机的时间戳延迟（单位：秒,cam_clock + td = imu_clock）
+    Vector3d Ps[(WINDOW_SIZE + 1)];   // 从滑窗在第0帧到第i帧的平移（在参考帧相机系下的表示）
+    Vector3d Vs[(WINDOW_SIZE + 1)];   // 滑动窗口中所有关键帧速度（从当前帧imu系到参考帧相机系）
+    Matrix3d Rs[(WINDOW_SIZE + 1)];   // 滑动窗口中所有关键帧姿态（从当前帧imu系到参考帧相机系）
+    Vector3d Bas[(WINDOW_SIZE + 1)];  // 滑动窗口中所有关键帧对应的加速度计偏置
+    Vector3d Bgs[(WINDOW_SIZE + 1)];  // 滑动窗口中所有关键帧对应的陀螺仪偏置
+    double td;      // IMU和相机的时间戳延迟（单位：秒,cam_clock + td = imu_clock）(使用参数文件中的参数初始化)
 
     Matrix3d back_R0, last_R, last_R0;
     Vector3d back_P0, last_P, last_P0;
-    std_msgs::Header Headers[(WINDOW_SIZE + 1)];
+    std_msgs::Header Headers[(WINDOW_SIZE + 1)];  // 滑动窗口中关键帧的图像头信息
 
-    IntegrationBase *pre_integrations[(WINDOW_SIZE + 1)]; // 预积分量（初始化为空指针）
+    IntegrationBase *pre_integrations[(WINDOW_SIZE + 1)]; // 关键帧的预积分量（初始化为空指针）
     Vector3d acc_0, gyr_0;  // 上一帧IMU测量
 
     //滑窗中的dt,a,v
@@ -108,26 +107,24 @@ class Estimator
     vector<Vector3d> point_cloud;
     vector<Vector3d> margin_cloud;
     vector<Vector3d> key_poses;
-    double initial_timestamp;
+    double initial_timestamp;  // 上次执行VIO初始化时的图像时间戳
 
 
-    double para_Pose[WINDOW_SIZE + 1][SIZE_POSE];
-    double para_SpeedBias[WINDOW_SIZE + 1][SIZE_SPEEDBIAS];
-    double para_Feature[NUM_OF_F][SIZE_FEATURE];
-    double para_Ex_Pose[NUM_OF_CAM][SIZE_POSE];
+    double para_Pose[WINDOW_SIZE + 1][SIZE_POSE];  // 滑窗中的位姿参数块（共11帧）
+    double para_SpeedBias[WINDOW_SIZE + 1][SIZE_SPEEDBIAS];  // 滑窗中的速度、IMU偏置参数块（共11帧）
+    double para_Feature[NUM_OF_F][SIZE_FEATURE]; 
+    double para_Ex_Pose[NUM_OF_CAM][SIZE_POSE];  // 相机和IMU外参的参数块（共1个相机）
     double para_Retrive_Pose[SIZE_POSE];
-    double para_Td[1][1];
+    double para_Td[1][1];  // 相机与IMU的时间戳延迟参数块
     double para_Tr[1][1];
 
     int loop_window_index;
 
-    MarginalizationInfo *last_marginalization_info;
-    vector<double *> last_marginalization_parameter_blocks;
+    MarginalizationInfo *last_marginalization_info;   // 上次边缘化所有信息
+    vector<double *> last_marginalization_parameter_blocks;  // 上次边缘化参数块
 
-    //kay是时间戳，val是图像帧
-    //图像帧中保存了图像帧的特征点、时间戳、位姿Rt，预积分对象pre_integration，是否是关键帧
-    map<double, ImageFrame> all_image_frame;
-    IntegrationBase *tmp_pre_integration;
+    map<double, ImageFrame> all_image_frame; // 所有图像帧对象（时间戳到图像帧的映射）
+    IntegrationBase *tmp_pre_integration; // 临时预积分量（初始化为空指针，只保存与最新图像帧相关的预积分量）
 
     //relocalization variable 重定位所需的变量
     bool relocalization_info;

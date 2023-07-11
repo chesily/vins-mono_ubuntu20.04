@@ -30,7 +30,7 @@ private:
     vector< Matrix3d > Rc;
     vector< Matrix3d > Rimu;
     vector< Matrix3d > Rc_g;
-    Matrix3d ric;
+    Matrix3d ric;  // 相机与IMU的旋转外参（初始化为单位阵）
 };
 
 

@@ -40,7 +40,7 @@ bool   init_imu     = 1;    // 是否是第一帧IMU
 double last_imu_t   = 0;
 
 /**
- * @brief 根据当前帧imu数据预测当前位姿和速度
+ * @brief 根据当前帧imu数据预测当前位姿和速度(用于IMU速率级位姿输出)
  * @param[in] imu_msg 当前帧IMU消息
  */
 void predict(const sensor_msgs::ImuConstPtr &imu_msg)
@@ -376,8 +376,8 @@ void process()
             for (unsigned int i = 0; i < img_msg->points.size(); i++)
             {
                 int v = img_msg->channels[0].values[i] + 0.5; // TODO特征点的ID+0.5（这里有隐式类型转换，应该向下取整，那是不是加不加0.5都无所谓）
-                int feature_id = v / NUM_OF_CAM;    
-                int camera_id = v % NUM_OF_CAM;     // 相机ID始终为0
+                int feature_id = v / NUM_OF_CAM;    // 特征点ID
+                int camera_id = v % NUM_OF_CAM;     // 相机ID（始终为0）
                 double x = img_msg->points[i].x;    // 去畸变的归一化坐标
                 double y = img_msg->points[i].y;
                 double z = img_msg->points[i].z;

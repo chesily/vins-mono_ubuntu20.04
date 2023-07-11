@@ -28,6 +28,7 @@ class Utility
         return dq;
     }
 
+    // 用向量构建反对称矩阵
     template <typename Derived>
     static Eigen::Matrix<typename Derived::Scalar, 3, 3> skewSymmetric(const Eigen::MatrixBase<Derived> &q)
     {
@@ -38,6 +39,7 @@ class Utility
         return ans;
     }
 
+    // 返回四元数本身，没有任何处理
     template <typename Derived>
     static Eigen::Quaternion<typename Derived::Scalar> positify(const Eigen::QuaternionBase<Derived> &q)
     {
@@ -48,6 +50,9 @@ class Utility
         return q;
     }
 
+    // 构造四元数的左乘矩阵[q]_L
+    // q_w * I + [0    -q_v^T]
+    //           [q_v [q_v]_x]
     template <typename Derived>
     static Eigen::Matrix<typename Derived::Scalar, 4, 4> Qleft(const Eigen::QuaternionBase<Derived> &q)
     {
@@ -58,6 +63,9 @@ class Utility
         return ans;
     }
 
+    // 构造四元数的右乘矩阵[q]_R
+    // q_w * I + [0     -q_v^T]
+    //           [q_v -[q_v]_x]
     template <typename Derived>
     static Eigen::Matrix<typename Derived::Scalar, 4, 4> Qright(const Eigen::QuaternionBase<Derived> &p)
     {
@@ -72,7 +80,7 @@ class Utility
     // R = [cpcy        cpsy        -sp
     //      srspcy-crsy srspsy+crcy srcp
     //      crspcy+srsy crspsy-srcy crcp]
-    // 这里的输入实际上是R^T（即调用这个函数时需要将旋转矩阵转置）
+    // 即这里的输入是R^w_b
     static Eigen::Vector3d R2ypr(const Eigen::Matrix3d &R)
     {
         Eigen::Vector3d n = R.col(0);  // 第一列
@@ -90,6 +98,7 @@ class Utility
         return ypr / M_PI * 180.0; // 将弧度转换为度
     }
 
+    // 将欧拉角变换为旋转矩阵（从机体系到参考系的旋转矩阵）
     template <typename Derived>
     static Eigen::Matrix<typename Derived::Scalar, 3, 3> ypr2R(const Eigen::MatrixBase<Derived> &ypr)
     {

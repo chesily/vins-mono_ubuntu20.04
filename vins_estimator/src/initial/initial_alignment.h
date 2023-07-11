@@ -10,6 +10,7 @@
 using namespace Eigen;
 using namespace std;
 
+// 图像帧(保存了图像帧的特征点、时间戳、位姿Rt，预积分对象pre_integration，是否是关键帧)
 class ImageFrame
 {
     public:
@@ -20,8 +21,8 @@ class ImageFrame
         };
         map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>> > > points;
         double t;
-        Matrix3d R;
-        Vector3d T;
+        Matrix3d R; // 当前帧的IMU坐标系到参考系的旋转矩阵
+        Vector3d T; // 当前帧的IMU坐标系到参考系的平移向量
         IntegrationBase *pre_integration;
         bool is_key_frame;
 };
